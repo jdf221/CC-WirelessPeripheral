@@ -57,7 +57,7 @@ local function sendReply(clientId, data)
 end
 
 local function recieveReply()
-    local clientId, message = rednet.receive(currentProtocol, 2)
+    local clientId, message = rednet.receive(currentProtocol, 10)
 
     if message == nil then
         return nil

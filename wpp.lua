@@ -21,7 +21,7 @@ local function log(message)
 
     if debugMode then
         print(logMessage)
-        rednet.broadcast({type="debug", version=CURRENT_VERSION, data=logMessage}, "debug_".. currentProtocol)
+        --rednet.broadcast({type="debug", version=CURRENT_VERSION, data=logMessage}, "debug_".. currentProtocol)
     end
 end
 
@@ -144,14 +144,18 @@ wireless = {
         log("Changing protocol from ".. currentProtocol .." to wpp@".. networkId)
         currentProtocol = "wpp@".. networkId
     end,
+    host=function(networkId)
+        rednet.unhost(currentProtocol)
+        wireless.connect(networkId)
+        rednet.host(currentProtocol, tostring(THIS_COMPUTER_ID))
+    end,
     localEventHandler=function(event)
         -- event: {1="message type", 2="sender client id", 3="message data", 4="protocol"}
         if event[1] == "rednet_message" then
             if event[4] == currentProtocol then
                 if event[3].version and event[3].version == CURRENT_VERSION then
+                    log("Recieved message: ".. textutils.serialize(event[3]))
                     if event[3].type == "function" then
-                        log("Recieved message: ".. textutils.serialize(event[3]))
-
                         wrappedPeripheralApi[event[3].data.func](event[2], unpack(event[3].data.args or {}))
                     end
                 else
@@ -171,9 +175,6 @@ wireless = {
             local event = {os.pullEvent()}
             wireless.localEventHandler(event)
         end
-    end,
-    broadcastOsEvent=function(event, ...)
-
     end,
     prefetchMethods=function(peripheralUrl, methods)
         log("New prefetchMethods(".. peripheralUrl ..", ".. textutils.serialize(methods) ..")")

@@ -25,7 +25,7 @@ But yeah in that screenshot you can see the idea of how it works. You have compu
 
 Install
 ```
-wget <link> wpp
+wget https://raw.githubusercontent.com/jdf221/CC-WirelessPeripheral/main/wpp.lua wpp
 ```
 
 As the computer connecting to/wanting to use the peripherals:

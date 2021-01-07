@@ -26,13 +26,14 @@ local function log(message)
 end
 
 -- Start->Wireless Modem Setup
-for n,side in ipairs({"top", "bottom", "front", "back", "left", "right"}) do
-    if peripheral.getType(side) == "modem" and peripheral.call(side, "isWireless") then
-        rednet.open(side)
-        break
-    elseif v == "right" then
-        error("No wireless modem found", 2)
+peripheral.find("modem", function(name, wrapped)
+    if wrapped.isWireless() then
+        rednet.open(name)
     end
+end)
+ 
+if not rednet.isOpen() then
+    error("No wireless modem found", 2)
 end
 -- End->Wireless Modem Setup
 

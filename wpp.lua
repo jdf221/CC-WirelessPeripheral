@@ -397,3 +397,5 @@ peripheral = {
 }
 -- End->New peripheral API using WPP
 -- End->Public API Functions
+
+return {wireless=wireless, peripheral=peripheral}

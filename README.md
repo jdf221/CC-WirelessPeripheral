@@ -30,7 +30,7 @@ wget https://raw.githubusercontent.com/jdf221/CC-WirelessPeripheral/main/wpp.lua
 
 As the computer connecting to/wanting to use the peripherals:
 ```lua
-os.loadAPI("wpp")
+local wpp = require("wpp")
 
 wpp.wireless.connect("network-name") -- Network name is used as a namespace esque thing so you can have multible different wireless peripheral systems going
 
@@ -40,7 +40,7 @@ wpp.peripheral.getNames() -- etc etc
 
 As the computer that is directly connected to the peripherals with a wired modem:
 ```lua
-os.loadAPI("wpp")
+local wpp = require("wpp")
 
 wpp.wireless.listen("network-name") -- Starts a loop waiting for wpp rednet messages
 

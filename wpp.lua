@@ -137,7 +137,7 @@ local wrappedPeripheralApi = {
 -- End->Wrapped Peripheral API funtcions
 
 -- Start->Public API functions.
-wireless = {
+local wireless = {
     setDebugMode=function(mode)
         debugMode = mode
     end,
@@ -217,7 +217,7 @@ wireless = {
 
 local nativePeripheral = peripheral
 -- Start->New peripheral API using WPP
-peripheral = {
+local peripheral = {
     getNames=function()
         local allNames = nativePeripheral.getNames()
     

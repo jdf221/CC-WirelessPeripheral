@@ -39,7 +39,7 @@ end
 
 -- Start->
 local function parsePeripheralUrl(peripheralUrl)
-    urlParts = splitString(peripheralUrl, "/")
+    local urlParts = splitString(peripheralUrl, "/")
 
     if urlParts[1] == (currentProtocol ..":") and urlParts[2] and urlParts[3] then
         return {clientId=tonumber(urlParts[2]), peripheralId=urlParts[3]}
@@ -72,28 +72,29 @@ local function recieveReply()
 end
 -- End->
 
+local nativePeripheral = peripheral
 -- Start->Wrapped Peripheral API funtcions
 --      These are ran on the computers that are directly connected to the peripherals
 local wrappedPeripheralApi = {
     getNames=function(clientId)
         log("Real getNames(".. clientId ..")")
 
-        sendReply(clientId, peripheral.getNames())
+        sendReply(clientId, nativePeripheral.getNames())
     end,
     isPresent=function(clientId, peripheralName)
         log("Real isPresent("..clientId..", ".. peripheralName ..")")
 
-        sendReply(clientId, peripheral.isPresent(peripheralName))
+        sendReply(clientId, nativePeripheral.isPresent(peripheralName))
     end,
     getType=function(clientId, peripheralName)
         log("Real getType("..clientId..", ".. peripheralName ..")")
 
-        sendReply(clientId, peripheral.getType(peripheralName))
+        sendReply(clientId, nativePeripheral.getType(peripheralName))
     end,
     getMethods=function(clientId, peripheralName)
         log("Real getMethods("..clientId..", ".. peripheralName ..")")
 
-        sendReply(clientId, peripheral.getMethods(peripheralName))
+        sendReply(clientId, nativePeripheral.getMethods(peripheralName))
     end,
     call=function(clientId, peripheralName, methodName, ...)
         local args = ...
@@ -101,7 +102,7 @@ local wrappedPeripheralApi = {
 
         local status,result = pcall(
             function()
-                local r = {peripheral.call(peripheralName, methodName, unpack(args))}
+                local r = {nativePeripheral.call(peripheralName, methodName, unpack(args))}
                 return r
             end)
 
@@ -112,6 +113,9 @@ local wrappedPeripheralApi = {
         local methodResults = {}
         
         for possibleMethodName,methodInfo in pairs(methods) do
+            local methodName
+            local methodArgs
+
             if type(methodInfo) == "table" then
                 methodName = possibleMethodName
                 methodArgs = methodInfo
@@ -122,12 +126,12 @@ local wrappedPeripheralApi = {
 
             local status,result = pcall(
             function()
-                local r = {peripheral.call(peripheralUrl, methodName, unpack(methodArgs))}
+                local r = {nativePeripheral.call(peripheralName, methodName, unpack(methodArgs))}
                 return r
             end)
     
             if status then
-                prefetchCache[peripheralUrl][methodName] = result
+                methodResults[methodName] = result
             end
         end
 
@@ -136,8 +140,9 @@ local wrappedPeripheralApi = {
 }
 -- End->Wrapped Peripheral API funtcions
 
--- Start->Public API functions.
+local remotePeripheral = {}
 local wireless = {}
+-- Start->Public API functions.
 function wireless.setDebugMode(mode)
     debugMode = mode
 end
@@ -190,6 +195,9 @@ function wireless.prefetchMethods(peripheralUrl, methods)
         prefetchCache[peripheralUrl] = {}
         
         for possibleMethodName,methodInfo in pairs(methods) do
+            local methodName
+            local methodArgs
+            
             if type(methodInfo) == "table" then
                 methodName = possibleMethodName
                 methodArgs = methodInfo
@@ -200,7 +208,7 @@ function wireless.prefetchMethods(peripheralUrl, methods)
 
             local status,result = pcall(
             function()
-                local r = {peripheral.call(peripheralUrl, methodName, unpack(methodArgs))}
+                local r = {remotePeripheral.call(peripheralUrl, methodName, unpack(methodArgs))}
                 return r
             end)
 
@@ -219,10 +227,8 @@ function wireless.prefetchMethods(peripheralUrl, methods)
     end
 end
 
-local nativePeripheral = peripheral
 -- Start->New peripheral API using WPP
-local peripheral = {}
-function peripheral.getNames()
+function remotePeripheral.getNames()
     local allNames = nativePeripheral.getNames()
 
     local clients = table.pack(rednet.lookup(currentProtocol))
@@ -245,7 +251,7 @@ function peripheral.getNames()
     return allNames
 end
 
-function peripheral.isPresent(peripheralUrl)
+function remotePeripheral.isPresent(peripheralUrl)
     log("New isPresent(".. peripheralUrl ..")")
 
     local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
@@ -266,7 +272,7 @@ function peripheral.isPresent(peripheralUrl)
     end
 end
 
-function peripheral.getType(peripheralUrl)
+function remotePeripheral.getType(peripheralUrl)
     log("New getType(".. peripheralUrl ..")")
 
     local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
@@ -287,7 +293,7 @@ function peripheral.getType(peripheralUrl)
     end
 end
 
-function peripheral.getMethods(peripheralUrl)
+function remotePeripheral.getMethods(peripheralUrl)
     log("New getMethods(".. peripheralUrl ..")")
 
     local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
@@ -308,7 +314,7 @@ function peripheral.getMethods(peripheralUrl)
     end
 end
 
-function peripheral.call(peripheralUrl, method, ...)
+function remotePeripheral.call(peripheralUrl, method, ...)
     log("New call(".. peripheralUrl ..", ".. method ..", ".. textutils.serialize(...) ..")")
 
     if prefetchCache[peripheralUrl] and prefetchCache[peripheralUrl][method] then
@@ -341,7 +347,7 @@ function peripheral.call(peripheralUrl, method, ...)
     end
 end
 
-function peripheral.wrap(peripheralUrl)
+function remotePeripheral.wrap(peripheralUrl)
     log("New wrap(".. peripheralUrl ..")")
 
     local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
@@ -350,11 +356,11 @@ function peripheral.wrap(peripheralUrl)
         log("New wrap(".. peripheralUrl ..") using local peripheral")
         return nativePeripheral.wrap(peripheralUrl)
     else
-        if not peripheral.isPresent(peripheralUrl) then
+        if not remotePeripheral.isPresent(peripheralUrl) then
             return nil
         end
 
-        local peripheralMethods = peripheral.getMethods(peripheralUrl)
+        local peripheralMethods = remotePeripheral.getMethods(peripheralUrl)
         log("New wrap(".. peripheralUrl ..") wrapping these methods: ".. textutils.serialize(peripheralMethods))
 
         local wrappedMethodsTable = {}
@@ -362,7 +368,7 @@ function peripheral.wrap(peripheralUrl)
         if peripheralMethods then
             for n,method in ipairs(peripheralMethods) do
                 wrappedMethodsTable[method] = function(...)
-                    return peripheral.call(peripheralUrl, method, ...)
+                    return remotePeripheral.call(peripheralUrl, method, ...)
                 end
             end
         end
@@ -375,18 +381,18 @@ function peripheral.wrap(peripheralUrl)
     end
 end
 
-function peripheral.find(type, filterFunction)
+function remotePeripheral.find(type, filterFunction)
     log("New find(".. type ..", hasFilterFunction=".. tostring(not(not filterFunction) or false) ..")")
     local foundToReturn = nativePeripheral.find(type, filterFunction)
 
-    local allPeripherals = peripheral.getNames()
+    local allPeripherals = remotePeripheral.getNames()
 
     for n,peripheralUrl in ipairs(allPeripherals) do
-        if peripheral.getType(peripheralUrl) == type then
-            local wrappedPeripheral = peripheral.wrap(peripheralUrl)
+        if remotePeripheral.getType(peripheralUrl) == type then
+            local wrappedPeripheral = remotePeripheral.wrap(peripheralUrl)
 
             if filterFunction then
-                local peripheralName = getName(peripheralUrl)
+                local peripheralName = remotePeripheral.getName(peripheralUrl)
 
                if(filterFunction(peripheralName, wrappedPeripheral)) then
                     table.insert(foundToReturn, wrappedPeripheral)
@@ -407,4 +413,4 @@ end
 -- End->New peripheral API using WPP
 -- End->Public API Functions
 
-return {wireless=wireless, peripheral=peripheral}
+return {wireless=wireless, peripheral=remotePeripheral}

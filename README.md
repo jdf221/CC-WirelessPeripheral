@@ -10,7 +10,7 @@ Not sure if this is useful for anyone, but figuired I'd put it out there since t
 ## Example of wiring setup
 You can have any number of computers running both ends of the wpp script.
 
-So you can have 5 computers all connected to different peripherals if you wanted. Or you can have just 1 ocmputer connected to a bunch of peripherals.
+So you can have 5 computers all connected to different peripherals if you wanted. Or you can have just 1 computer connected to a bunch of peripherals.
 
 Or you can have 5 computers all accessing wireless peripherals using the api, or just 1. Doesn't matter it should all just work as if everything was all connected to the one computer accessing the api.
 

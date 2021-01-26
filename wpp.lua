@@ -350,11 +350,11 @@ function peripheral.wrap(peripheralUrl)
         log("New wrap(".. peripheralUrl ..") using local peripheral")
         return nativePeripheral.wrap(peripheralUrl)
     else
-        if not isPresent(peripheralUrl) then
+        if not peripheral.isPresent(peripheralUrl) then
             return nil
         end
 
-        local peripheralMethods = getMethods(peripheralUrl)
+        local peripheralMethods = peripheral.getMethods(peripheralUrl)
         log("New wrap(".. peripheralUrl ..") wrapping these methods: ".. textutils.serialize(peripheralMethods))
 
         local wrappedMethodsTable = {}
@@ -382,8 +382,8 @@ function peripheral.find(type, filterFunction)
     local allPeripherals = peripheral.getNames()
 
     for n,peripheralUrl in ipairs(allPeripherals) do
-        if getType(peripheralUrl) == type then
-            local wrappedPeripheral = wrap(peripheralUrl)
+        if peripheral.getType(peripheralUrl) == type then
+            local wrappedPeripheral = peripheral.wrap(peripheralUrl)
 
             if filterFunction then
                 local peripheralName = getName(peripheralUrl)

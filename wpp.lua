@@ -137,264 +137,273 @@ local wrappedPeripheralApi = {
 -- End->Wrapped Peripheral API funtcions
 
 -- Start->Public API functions.
-local wireless = {
-    setDebugMode=function(mode)
-        debugMode = mode
-    end,
-    connect=function(networkId)
-        log("Changing protocol from ".. currentProtocol .." to wpp@".. networkId)
-        currentProtocol = "wpp@".. networkId
-    end,
-    host=function(networkId)
-        rednet.unhost(currentProtocol)
-        wireless.connect(networkId)
-        rednet.host(currentProtocol, tostring(THIS_COMPUTER_ID))
-    end,
-    localEventHandler=function(event)
-        -- event: {1="message type", 2="sender client id", 3="message data", 4="protocol"}
-        if event[1] == "rednet_message" then
-            if event[4] == currentProtocol then
-                if event[3].version and event[3].version == CURRENT_VERSION then
-                    log("Recieved message: ".. textutils.serialize(event[3]))
-                    if event[3].type == "function" then
-                        wrappedPeripheralApi[event[3].data.func](event[2], unpack(event[3].data.args or {}))
-                    end
-                else
-                    log("Recieved event from an unsupported WPP version. Only version '".. CURRENT_VERSION .."' is supported.")
-                end
-            end
-        end
-    end,
-    listen=function(networkId)
-        rednet.unhost(currentProtocol)
-        wireless.connect(networkId)
-        rednet.host(currentProtocol, tostring(THIS_COMPUTER_ID))
+local wireless = {}
+function wireless.setDebugMode(mode)
+    debugMode = mode
+end
 
-        print("Listening for WPP events on ".. currentProtocol)
-        print("Control+T to quit")
-        while(true) do
-            local event = {os.pullEvent()}
-            wireless.localEventHandler(event)
-        end
-    end,
-    prefetchMethods=function(peripheralUrl, methods)
-        log("New prefetchMethods(".. peripheralUrl ..", ".. textutils.serialize(methods) ..")")
-        local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
-    
-        if parsedPeripheralUrl == nil then
-            prefetchCache[peripheralUrl] = {}
-            
-            for possibleMethodName,methodInfo in pairs(methods) do
-                if type(methodInfo) == "table" then
-                    methodName = possibleMethodName
-                    methodArgs = methodInfo
-                else
-                    methodName = methodInfo
-                    methodArgs = {}
-                end
+function wireless.connect(networkId)
+    log("Changing protocol from ".. currentProtocol .." to wpp@".. networkId)
+    currentProtocol = "wpp@".. networkId
+end
 
-                local status,result = pcall(
-                function()
-                    local r = {peripheral.call(peripheralUrl, methodName, unpack(methodArgs))}
-                    return r
-                end)
-    
-                if status then
-                    prefetchCache[peripheralUrl][methodName] = result
+function wireless.host(networkId)
+    rednet.unhost(currentProtocol)
+    wireless.connect(networkId)
+    rednet.host(currentProtocol, tostring(THIS_COMPUTER_ID))
+end
+
+function wireless.localEventHandler(event)
+    -- event: {1="message type", 2="sender client id", 3="message data", 4="protocol"}
+    if event[1] == "rednet_message" then
+        if event[4] == currentProtocol then
+            if event[3].version and event[3].version == CURRENT_VERSION then
+                log("Recieved message: ".. textutils.serialize(event[3]))
+                if event[3].type == "function" then
+                    wrappedPeripheralApi[event[3].data.func](event[2], unpack(event[3].data.args or {}))
                 end
-            end
-        else
-            sendMessage(parsedPeripheralUrl.clientId, "function", {func="wppPrefetch", args={parsedPeripheralUrl.peripheralId, methods}})
-    
-            local reply = recieveReply()
-    
-            if reply then
-                prefetchCache[peripheralUrl] = reply.data
+            else
+                log("Recieved event from an unsupported WPP version. Only version '".. CURRENT_VERSION .."' is supported.")
             end
         end
     end
-}
+end
+
+function wireless.listen(networkId)
+    rednet.unhost(currentProtocol)
+    wireless.connect(networkId)
+    rednet.host(currentProtocol, tostring(THIS_COMPUTER_ID))
+
+    print("Listening for WPP events on ".. currentProtocol)
+    print("Control+T to quit")
+    while(true) do
+        local event = {os.pullEvent()}
+        wireless.localEventHandler(event)
+    end
+end
+
+function wireless.prefetchMethods(peripheralUrl, methods)
+    log("New prefetchMethods(".. peripheralUrl ..", ".. textutils.serialize(methods) ..")")
+    local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
+
+    if parsedPeripheralUrl == nil then
+        prefetchCache[peripheralUrl] = {}
+        
+        for possibleMethodName,methodInfo in pairs(methods) do
+            if type(methodInfo) == "table" then
+                methodName = possibleMethodName
+                methodArgs = methodInfo
+            else
+                methodName = methodInfo
+                methodArgs = {}
+            end
+
+            local status,result = pcall(
+            function()
+                local r = {peripheral.call(peripheralUrl, methodName, unpack(methodArgs))}
+                return r
+            end)
+
+            if status then
+                prefetchCache[peripheralUrl][methodName] = result
+            end
+        end
+    else
+        sendMessage(parsedPeripheralUrl.clientId, "function", {func="wppPrefetch", args={parsedPeripheralUrl.peripheralId, methods}})
+
+        local reply = recieveReply()
+
+        if reply then
+            prefetchCache[peripheralUrl] = reply.data
+        end
+    end
+end
 
 local nativePeripheral = peripheral
 -- Start->New peripheral API using WPP
-local peripheral = {
-    getNames=function()
-        local allNames = nativePeripheral.getNames()
-    
-        local clients = table.pack(rednet.lookup(currentProtocol))
-        log("New getNames() found these clients: ".. textutils.serialize(clients))
-    
-        for n,clientId in ipairs(clients) do
-            if clientId ~= THIS_COMPUTER_ID then
-                sendMessage(clientId, "function", {func="getNames"})
-                local reply = recieveReply()
-                log("New getNames() reply: ".. textutils.serialize(reply))
-    
-                if reply then
-                    for n,name in ipairs(reply.data) do
-                        table.insert(allNames, currentProtocol .."://" .. clientId .. "/" .. name)
-                    end
+local peripheral = {}
+function peripheral.getNames()
+    local allNames = nativePeripheral.getNames()
+
+    local clients = table.pack(rednet.lookup(currentProtocol))
+    log("New getNames() found these clients: ".. textutils.serialize(clients))
+
+    for n,clientId in ipairs(clients) do
+        if clientId ~= THIS_COMPUTER_ID then
+            sendMessage(clientId, "function", {func="getNames"})
+            local reply = recieveReply()
+            log("New getNames() reply: ".. textutils.serialize(reply))
+
+            if reply then
+                for n,name in ipairs(reply.data) do
+                    table.insert(allNames, currentProtocol .."://" .. clientId .. "/" .. name)
                 end
             end
         end
-    
-        return allNames
-    end,
-    isPresent=function(peripheralUrl)
-        log("New isPresent(".. peripheralUrl ..")")
-    
-        local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
-    
-        if parsedPeripheralUrl == nil then
-            log("New isPresent(".. peripheralUrl ..") using local peripheral")
-            return nativePeripheral.isPresent(peripheralUrl)
+    end
+
+    return allNames
+end
+
+function peripheral.isPresent(peripheralUrl)
+    log("New isPresent(".. peripheralUrl ..")")
+
+    local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
+
+    if parsedPeripheralUrl == nil then
+        log("New isPresent(".. peripheralUrl ..") using local peripheral")
+        return nativePeripheral.isPresent(peripheralUrl)
+    else
+        sendMessage(parsedPeripheralUrl.clientId, "function", {func="isPresent", args={parsedPeripheralUrl.peripheralId}})
+        local reply = recieveReply()
+        log("New isPresent(".. peripheralUrl ..") reply: ".. textutils.serialize(reply))
+
+        if reply then
+            return reply.data;
         else
-            sendMessage(parsedPeripheralUrl.clientId, "function", {func="isPresent", args={parsedPeripheralUrl.peripheralId}})
-            local reply = recieveReply()
-            log("New isPresent(".. peripheralUrl ..") reply: ".. textutils.serialize(reply))
-    
-            if reply then
-                return reply.data;
-            else
-                return false
-            end
+            return false
         end
-    end,
-    getType=function(peripheralUrl)
-        log("New getType(".. peripheralUrl ..")")
-    
-        local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
-    
-        if parsedPeripheralUrl == nil then
-            log("New getType(".. peripheralUrl ..") using local peripheral")
-            return nativePeripheral.getType(peripheralUrl)
+    end
+end
+
+function peripheral.getType(peripheralUrl)
+    log("New getType(".. peripheralUrl ..")")
+
+    local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
+
+    if parsedPeripheralUrl == nil then
+        log("New getType(".. peripheralUrl ..") using local peripheral")
+        return nativePeripheral.getType(peripheralUrl)
+    else
+        sendMessage(parsedPeripheralUrl.clientId, "function", {func="getType", args={parsedPeripheralUrl.peripheralId}})
+        local reply = recieveReply()
+        log("New getType(".. peripheralUrl ..") reply: ".. textutils.serialize(reply))
+
+        if reply then
+            return reply.data;
         else
-            sendMessage(parsedPeripheralUrl.clientId, "function", {func="getType", args={parsedPeripheralUrl.peripheralId}})
-            local reply = recieveReply()
-            log("New getType(".. peripheralUrl ..") reply: ".. textutils.serialize(reply))
-    
-            if reply then
-                return reply.data;
-            else
-                return nil
-            end
-        end
-    end,
-    getMethods=function(peripheralUrl)
-        log("New getMethods(".. peripheralUrl ..")")
-    
-        local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
-    
-        if parsedPeripheralUrl == nil then
-            log("New getMethods(".. peripheralUrl ..") using local peripheral")
-            return nativePeripheral.getMethods(peripheralUrl)
-        else
-            sendMessage(parsedPeripheralUrl.clientId, "function", {func="getMethods", args={parsedPeripheralUrl.peripheralId}})
-            local reply = recieveReply()
-            log("New getMethods(".. peripheralUrl ..") reply: ".. textutils.serialize(reply))
-    
-            if reply then
-                return reply.data;
-            else
-                return nil
-            end
-        end
-    end,
-    call=function(peripheralUrl, method, ...)
-        log("New call(".. peripheralUrl ..", ".. method ..", ".. textutils.serialize(...) ..")")
-    
-        if prefetchCache[peripheralUrl] and prefetchCache[peripheralUrl][method] then
-            log("New call(".. peripheralUrl ..", ".. method ..") using prefetched return")
-            local returnValue = prefetchCache[peripheralUrl][method]
-            prefetchCache[peripheralUrl][method] = nil
-    
-            return unpack(returnValue)
-        end
-    
-        local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
-    
-        if parsedPeripheralUrl == nil then
-            log("New call(".. peripheralUrl ..", ".. method ..") using local peripheral")
-            return nativePeripheral.call(peripheralUrl, method, ...)
-        else
-            sendMessage(parsedPeripheralUrl.clientId, "function", {func="call", args={parsedPeripheralUrl.peripheralId, method, {...}}})
-            local reply = recieveReply()
-            log("New call(".. peripheralUrl ..", ".. method ..") reply: ".. textutils.serialize(reply))
-    
-            if reply then
-                if reply.data.error then
-                    error(reply.data.returned)
-                end
-    
-                return unpack(reply.data.returned);
-            else
-                return nil
-            end
-        end
-    end,
-    wrap=function(peripheralUrl)
-        log("New wrap(".. peripheralUrl ..")")
-    
-        local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
-    
-        if parsedPeripheralUrl == nil then
-            log("New wrap(".. peripheralUrl ..") using local peripheral")
-            return nativePeripheral.wrap(peripheralUrl)
-        else
-            if not isPresent(peripheralUrl) then
-                return nil
-            end
-    
-            local peripheralMethods = getMethods(peripheralUrl)
-            log("New wrap(".. peripheralUrl ..") wrapping these methods: ".. textutils.serialize(peripheralMethods))
-    
-            local wrappedMethodsTable = {}
-    
-            if peripheralMethods then
-                for n,method in ipairs(peripheralMethods) do
-                    wrappedMethodsTable[method] = function(...)
-                        return peripheral.call(peripheralUrl, method, ...)
-                    end
-                end
-            end
-    
-            wrappedMethodsTable["wppPrefetch"] = function(methods)
-                wireless.prefetchMethods(peripheralUrl, methods)
-            end
-    
-            return wrappedMethodsTable;
-        end
-    end,
-    find=function(type, filterFunction)
-        log("New find(".. type ..", hasFilterFunction=".. tostring(not(not filterFunction) or false) ..")")
-        local foundToReturn = nativePeripheral.find(type, filterFunction)
-    
-        local allPeripherals = peripheral.getNames()
-    
-        for n,peripheralUrl in ipairs(allPeripherals) do
-            if getType(peripheralUrl) == type then
-                local wrappedPeripheral = wrap(peripheralUrl)
-    
-                if filterFunction then
-                    local peripheralName = getName(peripheralUrl)
-    
-                   if(filterFunction(peripheralName, wrappedPeripheral)) then
-                        table.insert(foundToReturn, wrappedPeripheral)
-                   end
-                else
-                    table.insert(foundToReturn, wrappedPeripheral)
-                end
-            end
-        end
-    
-        local next = next
-        if next(foundToReturn) == nil then
             return nil
-        else
-            return foundToReturn
         end
-    end,
-}
+    end
+end
+
+function peripheral.getMethods(peripheralUrl)
+    log("New getMethods(".. peripheralUrl ..")")
+
+    local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
+
+    if parsedPeripheralUrl == nil then
+        log("New getMethods(".. peripheralUrl ..") using local peripheral")
+        return nativePeripheral.getMethods(peripheralUrl)
+    else
+        sendMessage(parsedPeripheralUrl.clientId, "function", {func="getMethods", args={parsedPeripheralUrl.peripheralId}})
+        local reply = recieveReply()
+        log("New getMethods(".. peripheralUrl ..") reply: ".. textutils.serialize(reply))
+
+        if reply then
+            return reply.data;
+        else
+            return nil
+        end
+    end
+end
+
+function peripheral.call(peripheralUrl, method, ...)
+    log("New call(".. peripheralUrl ..", ".. method ..", ".. textutils.serialize(...) ..")")
+
+    if prefetchCache[peripheralUrl] and prefetchCache[peripheralUrl][method] then
+        log("New call(".. peripheralUrl ..", ".. method ..") using prefetched return")
+        local returnValue = prefetchCache[peripheralUrl][method]
+        prefetchCache[peripheralUrl][method] = nil
+
+        return unpack(returnValue)
+    end
+
+    local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
+
+    if parsedPeripheralUrl == nil then
+        log("New call(".. peripheralUrl ..", ".. method ..") using local peripheral")
+        return nativePeripheral.call(peripheralUrl, method, ...)
+    else
+        sendMessage(parsedPeripheralUrl.clientId, "function", {func="call", args={parsedPeripheralUrl.peripheralId, method, {...}}})
+        local reply = recieveReply()
+        log("New call(".. peripheralUrl ..", ".. method ..") reply: ".. textutils.serialize(reply))
+
+        if reply then
+            if reply.data.error then
+                error(reply.data.returned)
+            end
+
+            return unpack(reply.data.returned);
+        else
+            return nil
+        end
+    end
+end
+
+function peripheral.wrap(peripheralUrl)
+    log("New wrap(".. peripheralUrl ..")")
+
+    local parsedPeripheralUrl = parsePeripheralUrl(peripheralUrl)
+
+    if parsedPeripheralUrl == nil then
+        log("New wrap(".. peripheralUrl ..") using local peripheral")
+        return nativePeripheral.wrap(peripheralUrl)
+    else
+        if not isPresent(peripheralUrl) then
+            return nil
+        end
+
+        local peripheralMethods = getMethods(peripheralUrl)
+        log("New wrap(".. peripheralUrl ..") wrapping these methods: ".. textutils.serialize(peripheralMethods))
+
+        local wrappedMethodsTable = {}
+
+        if peripheralMethods then
+            for n,method in ipairs(peripheralMethods) do
+                wrappedMethodsTable[method] = function(...)
+                    return peripheral.call(peripheralUrl, method, ...)
+                end
+            end
+        end
+
+        wrappedMethodsTable["wppPrefetch"] = function(methods)
+            wireless.prefetchMethods(peripheralUrl, methods)
+        end
+
+        return wrappedMethodsTable;
+    end
+end
+
+function peripheral.find(type, filterFunction)
+    log("New find(".. type ..", hasFilterFunction=".. tostring(not(not filterFunction) or false) ..")")
+    local foundToReturn = nativePeripheral.find(type, filterFunction)
+
+    local allPeripherals = peripheral.getNames()
+
+    for n,peripheralUrl in ipairs(allPeripherals) do
+        if getType(peripheralUrl) == type then
+            local wrappedPeripheral = wrap(peripheralUrl)
+
+            if filterFunction then
+                local peripheralName = getName(peripheralUrl)
+
+               if(filterFunction(peripheralName, wrappedPeripheral)) then
+                    table.insert(foundToReturn, wrappedPeripheral)
+               end
+            else
+                table.insert(foundToReturn, wrappedPeripheral)
+            end
+        end
+    end
+
+    local next = next
+    if next(foundToReturn) == nil then
+        return nil
+    else
+        return foundToReturn
+    end
+end
 -- End->New peripheral API using WPP
 -- End->Public API Functions
 

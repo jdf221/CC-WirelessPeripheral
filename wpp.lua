@@ -76,6 +76,21 @@ local nativePeripheral = peripheral
 -- Start->Wrapped Peripheral API funtcions
 --      These are ran on the computers that are directly connected to the peripherals
 local wrappedPeripheralApi = {
+    pullEvent=function(clientId)
+        log("Real pullEvent(".. clientId ..")")
+    
+        while true do
+          local eventT = {}
+          event1, side, xPos, yPos = os.pullEvent("monitor_touch") 
+          
+          table.insert(eventT, event1)
+          table.insert(eventT, side)
+          table.insert(eventT, xPos)
+          table.insert(eventT, yPos)
+          
+          sendReply(clientId, textutils.serialize(eventT))
+        end
+    end,
     getNames=function(clientId)
         log("Real getNames(".. clientId ..")")
 
@@ -139,6 +154,21 @@ local wrappedPeripheralApi = {
     end,
 }
 -- End->Wrapped Peripheral API funtcions
+
+-- Start->pullEvent API funtcion
+function pullEvent()
+    sendMessage(7, "function", {func="pullEvent"})
+    local reply = recieveReply()
+    if reply.data then
+      t = textutils.unserialize(reply.data)
+      eventname = t[1]
+      param1 = t[2]
+      param2 = t[3]
+      param3 = t[4]
+      return eventname, param1, param2, param3
+    end
+end
+-- End->pullEvent API funtcion
 
 local remotePeripheral = {}
 local wireless = {}
@@ -413,4 +443,4 @@ end
 -- End->New peripheral API using WPP
 -- End->Public API Functions
 
-return {wireless=wireless, peripheral=remotePeripheral}
+return {wireless=wireless, peripheral=remotePeripheral, pullEvent=pullEvent}

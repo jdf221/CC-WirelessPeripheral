@@ -159,7 +159,7 @@ local wrappedPeripheralApi = {
 function pullEvent()
     sendMessage(7, "function", {func="pullEvent"})
     local reply = recieveReply()
-    if reply.data then
+    if reply and reply.data then
       t = textutils.unserialize(reply.data)
       eventname = t[1]
       param1 = t[2]

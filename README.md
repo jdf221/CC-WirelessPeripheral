@@ -43,8 +43,10 @@ As the computer that is directly connected to the peripherals with a wired modem
 local wpp = require("wpp")
 
 wpp.wireless.listen("network-name") -- Starts a loop waiting for wpp rednet messages
+```
 
--- You can also have your own while loop if needed:
+Or you can have your own while loop if needed:
+```lua
 wpp.wireless.host("network-name")
 
 while true do

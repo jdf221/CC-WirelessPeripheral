@@ -315,7 +315,7 @@ function remotePeripheral.getMethods(peripheralUrl)
 end
 
 function remotePeripheral.call(peripheralUrl, method, ...)
-    log("New call(".. peripheralUrl ..", ".. method ..", ".. textutils.serialize(...) ..")")
+    log("New call(".. peripheralUrl ..", ".. method ..", ".. textutils.serialize({...}) ..")")
 
     if prefetchCache[peripheralUrl] and prefetchCache[peripheralUrl][method] then
         log("New call(".. peripheralUrl ..", ".. method ..") using prefetched return")

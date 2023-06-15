@@ -1,6 +1,8 @@
 # CC-WirelessPeripheral
 An implementation of the Computer Craft peripheral API allowing the use of wireless modems
 
+[Jump to how to use it](#usage)
+
 The idea was to allow a wireless modem to act exactly like when you use a wired modem connected to peripherals. So imagine this as if every peripheral on your network were directly connected to the computer using the API. The API returns the peripherals connected directly to the computer as well so this can be a drop in replacement for the real peripheral API.
 
 Not sure if this is useful for anyone, but figuired I'd put it out there since the only one I could find online didn't work anymore. If you need any help feel free to open an issue or ask me /u/jdf2 @jdf221

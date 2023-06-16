@@ -1,11 +1,19 @@
 local debugMode = false
-local CURRENT_VERSION = "1"
+local CURRENT_VERSION = "2"
 local THIS_COMPUTER_ID = os.getComputerID()
 
 local currentProtocol = "wpp@default"
 local prefetchCache = {}
 
-local function splitString (inputstr, sep)
+local function cloneTable(oldTable)
+    local newTable = {}
+    for k,v in pairs(oldTable) do
+        newTable[k] = v
+    end
+    return newTable
+end
+
+local function splitString(inputstr, sep)
     if sep == nil then
         sep = "%s"
     end
@@ -14,6 +22,36 @@ local function splitString (inputstr, sep)
         table.insert(t, str)
     end
     return t
+end
+
+local function accessKeyPath(theTable, keyPath)
+    for k,currentKey in pairs(keyPath) do
+        theTable = theTable[currentKey]
+    end
+
+    return theTable
+end
+
+local function walkTableAndModify(theTableOrValue, handlerFn, keyPath)
+    if keyPath == nil then
+        keyPath = {}
+    end
+
+    if type(theTableOrValue) == "table" then
+        theTableOrValue = handlerFn(keyPath, theTableOrValue)
+        if type(theTableOrValue) ~= "table" then
+            return theTableOrValue
+        end
+
+        for k,v in pairs(theTableOrValue) do
+            newKeyPath = cloneTable(keyPath)
+            table.insert(newKeyPath, k)
+            theTableOrValue[k] = walkTableAndModify(v, handlerFn, newKeyPath)
+        end
+        return theTableOrValue
+    else
+        return handlerFn(keyPath, theTableOrValue)
+    end
 end
 
 local function log(message)
@@ -42,7 +80,16 @@ local function parsePeripheralUrl(peripheralUrl)
     local urlParts = splitString(peripheralUrl, "/")
 
     if urlParts[1] == (currentProtocol ..":") and urlParts[2] and urlParts[3] then
-        return {clientId=tonumber(urlParts[2]), peripheralId=urlParts[3]}
+        returnTable = {clientId=tonumber(urlParts[2]), peripheralId=urlParts[3]}
+
+        if urlParts[4] then
+            returnTable.methodName = urlParts[4]
+            if urlParts[5] then
+                returnTable.keyPath = {unpack(urlParts, 5)}
+            end
+        end
+
+        return returnTable
     else
         return nil
     end
@@ -102,8 +149,44 @@ local wrappedPeripheralApi = {
 
         local status,result = pcall(
             function()
-                local r = {nativePeripheral.call(peripheralName, methodName, unpack(args))}
-                return r
+                local callResult = {nativePeripheral.call(peripheralName, methodName, unpack(args))}
+                callResult = {test=function()
+                
+                end}
+
+                callResult = walkTableAndModify(callResult, function(keyPath, value)
+                    if type(value) == "function" then
+                        return {isWppRpcRefrence=true, funcUrl=currentProtocol .. "://" .. clientId .. "/" .. peripheralName, methodName=methodName, methodArguments=args, keyPath=keyPath}
+                    end
+                    return value
+                end)
+
+                return callResult
+            end)
+
+        sendReply(clientId, {returned=result, error=not status})
+    end,
+    callRpcFunction=function(clientId, peripheralName, methodName, methodArguments, keyPath, ...)
+        local args = ...
+        debug("Real callRpcFunction("..clientId..", ".. peripheralName ..", ".. methodName ..", ".. textutils.serialize(methodArguments) ..", ".. textutils.serialize(keyPath) ..", ".. textutils.serialize(args) ..")")
+
+        local status,result = pcall(
+            function()
+                local callResult = {nativePeripheral.call(peripheralName, methodName, unpack(methodArguments))}
+                callResult = {test=function()
+                    return "bobb"
+                end}
+
+                nestedCallResult = accessKeyPath(callResult, keyPath)()
+
+                nestedCallResult = walkTableAndModify(nestedCallResult, function(keyPath, value)
+                    if type(value) == "function" then
+                        return {isWppRpcRefrence=true, funcUrl=currentProtocol .. "://" .. clientId .. "/" .. peripheralName, methodName=methodName, methodArguments=methodArguments, keyPath=keyPath}
+                    end
+                    return value
+                end)
+
+                return nestedCallResult
             end)
 
         sendReply(clientId, {returned=result, error=not status})
@@ -168,7 +251,7 @@ function wireless.localEventHandler(event)
                     wrappedPeripheralApi[event[3].data.func](event[2], unpack(event[3].data.args or {}))
                 end
             else
-                log("Recieved event from an unsupported WPP version. Only version '".. CURRENT_VERSION .."' is supported.")
+                print("Recieved event from an unsupported WPP version ("..event[3].version.."). Only version '".. CURRENT_VERSION .."' is supported.")
             end
         end
     end
@@ -180,7 +263,7 @@ function wireless.listen(networkId)
     rednet.host(currentProtocol, tostring(THIS_COMPUTER_ID))
 
     print("Listening for WPP events on ".. currentProtocol)
-    print("Control+T to quit")
+    print("Hold Control+T to quit")
     while(true) do
         local event = {os.pullEvent()}
         wireless.localEventHandler(event)
@@ -340,7 +423,29 @@ function remotePeripheral.call(peripheralUrl, method, ...)
                 error(reply.data.returned)
             end
 
-            return unpack(reply.data.returned);
+            result = walkTableAndModify(reply.data.returned, function(keyPath, value)
+                if type(value) == "table" and value.isWppRpcRefrence then
+                    return (function(...)
+                        sendMessage(parsedPeripheralUrl.clientId, "function", {func="callRpcFunction", args={parsedPeripheralUrl.peripheralId, method, value.methodArguments, value.keyPath, {...}}})
+
+                        local reply = recieveReply()
+                        if reply then
+                            if reply.data.error then
+                                error(reply.data.returned)
+                            end
+
+                            return reply.data.returned
+                        else
+                            return nil
+                        end
+                        return 
+                    end)
+                end
+
+                return value
+            end)
+            
+            return result;
         else
             return nil
         end

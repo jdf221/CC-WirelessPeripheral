@@ -150,10 +150,7 @@ local wrappedPeripheralApi = {
         local status,result = pcall(
             function()
                 local callResult = {nativePeripheral.call(peripheralName, methodName, unpack(args))}
-                callResult = {test=function()
                 
-                end}
-
                 callResult = walkTableAndModify(callResult, function(keyPath, value)
                     if type(value) == "function" then
                         return {isWppRpcRefrence=true, funcUrl=currentProtocol .. "://" .. clientId .. "/" .. peripheralName, methodName=methodName, methodArguments=args, keyPath=keyPath}

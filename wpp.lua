@@ -388,9 +388,7 @@ function remotePeripheral.find(_type, filterFunction)
     local allPeripherals = remotePeripheral.getNames()
 
     for n,peripheralUrl in ipairs(allPeripherals) do
-        print(remotePeripheral.getType(peripheralUrl))
         if remotePeripheral.getType(peripheralUrl) == _type then
-            print("matches type")
             local wrappedPeripheral = remotePeripheral.wrap(peripheralUrl)
 
             if filterFunction then
@@ -407,7 +405,6 @@ function remotePeripheral.find(_type, filterFunction)
 
     local next = next
     if next(foundToReturn) == nil then
-        print("returning nil from find")
         return nil
     else
         return table.unpack(foundToReturn)

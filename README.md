@@ -30,7 +30,7 @@ Install
 wget https://raw.githubusercontent.com/jdf221/CC-WirelessPeripheral/main/wpp.lua wpp
 ```
 
-As the computer connecting to/wanting to use the peripherals:
+As the computer wanting to use/access the remote peripherals:
 ```lua
 local wpp = require("wpp")
 

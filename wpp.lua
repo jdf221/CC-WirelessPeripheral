@@ -383,7 +383,7 @@ end
 
 function remotePeripheral.find(type, filterFunction)
     log("New find(".. type ..", hasFilterFunction=".. tostring(not(not filterFunction) or false) ..")")
-    local foundToReturn = nativePeripheral.find(type, filterFunction)
+    local foundToReturn = {nativePeripheral.find(type, filterFunction)}
 
     local allPeripherals = remotePeripheral.getNames()
 

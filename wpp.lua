@@ -381,14 +381,14 @@ function remotePeripheral.wrap(peripheralUrl)
     end
 end
 
-function remotePeripheral.find(type, filterFunction)
-    log("New find(".. type ..", hasFilterFunction=".. tostring(not(not filterFunction) or false) ..")")
-    local foundToReturn = {nativePeripheral.find(type, filterFunction)}
+function remotePeripheral.find(_type, filterFunction)
+    log("New find(".. _type ..", hasFilterFunction=".. tostring(not(not filterFunction) or false) ..")")
+    local foundToReturn = {nativePeripheral.find(_type, filterFunction)}
 
     local allPeripherals = remotePeripheral.getNames()
 
     for n,peripheralUrl in ipairs(allPeripherals) do
-        if remotePeripheral.getType(peripheralUrl) == type then
+        if remotePeripheral.getType(peripheralUrl) == _type then
             local wrappedPeripheral = remotePeripheral.wrap(peripheralUrl)
 
             if filterFunction then
@@ -407,7 +407,7 @@ function remotePeripheral.find(type, filterFunction)
     if next(foundToReturn) == nil then
         return nil
     else
-        return foundToReturn
+        return table.unpack(foundToReturn)
     end
 end
 -- End->New peripheral API using WPP

@@ -389,6 +389,7 @@ function remotePeripheral.find(_type, filterFunction)
 
     for n,peripheralUrl in ipairs(allPeripherals) do
         if remotePeripheral.getType(peripheralUrl) == _type then
+            print(remotePeripheral.getType(peripheralUrl))
             local wrappedPeripheral = remotePeripheral.wrap(peripheralUrl)
 
             if filterFunction then
